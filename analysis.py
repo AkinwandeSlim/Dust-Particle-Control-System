@@ -46,8 +46,13 @@ scaler = StandardScaler()
 
 
 BASE_DIR = os.getcwd()
-MODEL_DIR =BASE_DIR+'/models/'
-hist_data=None
+MODEL_DIR ='models/'
+
+
+if not os.path.exists(MODEL_DIR):
+    os.makedirs(MODEL_DIR)
+
+
 def get_binary_file_downloader_html(bin_file, file_label='File'):
     with open(bin_file, 'rb') as f:
         data = f.read()
@@ -557,11 +562,8 @@ def load_app_model(model_path):
     """Loads the model from the specified path with error handling."""
     try:
         return joblib.load(model_path)
-    except FileNotFoundError:
-        st.error(f"Model not found at {model_path}. Please check your deployment.")
     except Exception as e:
-        st.error(f"Error loading model: {e}")
-
+        raise RuntimeError(f"Failed to load model: {e}")
 
 # Function to calculate the rolling mean for the prediction
 def calculate_rolling_mean(df, window=30):
@@ -703,7 +705,7 @@ def show_Analysis():
             res = stats.probplot(data['pm25_log'], plot=plt)
             st.pyplot(fig)
             st.subheader('Modeling')
-            models = ['Linear Regression', 'XGBoost', 'RandomForest', 'Bagging Regressor', 'Voting']
+            models = ['Linear Regression', 'XGBoost', 'Random Forest', 'Bagging Regressor', 'Voting']
             model_choice = st.selectbox("Choose a model", models)
             data = data.select_dtypes(['int', 'float'])
             X_train, X_test, y_train, y_test = prepareData(data, test_size=0.2, target_encoding=False, timeseries='ml')
@@ -718,7 +720,7 @@ def show_Analysis():
                 model = XGBRegressor()
             elif model_choice == 'Bagging Regressor':
                 model = BaggingRegressor(n_estimators=100, random_state=42)
-            elif model_choice == 'RandomForest':
+            elif model_choice == 'Random Forest':
                 model = RandomForestRegressor()
             elif model_choice == 'Voting':
                 rnd_reg = RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42)
@@ -810,25 +812,21 @@ def show_Analysis():
 
 
 
-
 def show_predict():
     st.subheader('Prediction')
 
-    # Dynamically list all available models in the directory
     try:
         model_files = [f for f in os.listdir(MODEL_DIR) if f.endswith('.pkl')]
     except FileNotFoundError:
-        st.error("Model directory not found. Ensure 'MODEL_DIR' is correctly set.")
+        st.error("Model directory not found.")
         return
 
-    if len(model_files) == 0:
-        st.write("No models available for prediction. Please train a model first.")
+    if not model_files:
+        st.write("No models available. Please train a model first.")
         return
 
-    # Select a model from available options
     selected_model = st.selectbox("Select a saved model", model_files)
 
-    # Collect user inputs for features
     pm10 = st.number_input("PM10")
     temp = st.number_input("Temperature (°C)")
     hum = st.number_input("Humidity (%)")
@@ -836,65 +834,50 @@ def show_predict():
     wspd = st.number_input("Wind Speed (m/s)")
     wdir = st.number_input("Wind Direction (°)")
     rain = st.number_input("Rainfall (mm)")
-    hour = st.number_input("Hour of the Day", min_value=0, max_value=23, value=12)
+    hour = st.number_input("Hour", min_value=0, max_value=23, value=12)
     minutes = st.number_input("Minutes", min_value=0, max_value=59, value=30)
 
-    input_data = np.array([pm10, temp, hum, press, wspd, wdir, rain, hour, minutes])
+    input_data = np.array([pm10, temp, hum, press, wspd, wdir, rain, hour, minutes]).reshape(1, -1)
 
-    # Check if uploaded data is present and valid in session state
     if 'uploaded_data' in st.session_state and isinstance(st.session_state['uploaded_data'], pd.DataFrame):
- 
         historical_data = st.session_state['uploaded_data']
 
-        # Validate that the data is a DataFrame
-        if isinstance(historical_data, pd.DataFrame):
-            if 'pm25' in historical_data.columns:
-                historical_data['pm25_log'] = np.log1p(historical_data['pm25'])
-            else:
-                st.error("'pm25' column is missing in the uploaded dataset.")
-                return
-        else:
-            st.error("Uploaded data is not a valid DataFrame. Please re-upload the data.")
+        if 'pm25' not in historical_data.columns:
+            st.error("'pm25' column missing.")
             return
 
-        # Prepare data for model prediction
-        X_train, _, _, _ = prepareData(historical_data, test_size=0.2, target_encoding=False, timeseries='ml')
+        historical_data['pm25_log'] = np.log1p(historical_data['pm25'])
 
-        # Handle model path dynamically and check for errors
+        try:
+            X_train, _, _, _ = prepareData(historical_data, test_size=0.2, target_encoding=False, timeseries='ml')
+        except Exception as e:
+            st.error(f"Error in preparing data: {e}")
+            return
+
         model_path = os.path.join(MODEL_DIR, selected_model)
 
         if st.button("Predict"):
             try:
-                # Ensure the model file exists before loading
                 if not os.path.exists(model_path):
-                    st.error(f"Model file '{selected_model}' not found.")
+                    st.error(f"Model '{selected_model}' not found.")
                     return
 
                 model = load_app_model(model_path)
-
-                # Retrieve scaler from session state
                 scaler = st.session_state.get('scaler')
                 if scaler is None:
-                    st.error("Scaler not found in session state. Please re-train or upload the scaler.")
+                    st.error("Scaler not found. Please upload or re-train.")
                     return
 
-                # Make prediction
                 result = predict_single_data_point(model, input_data, X_train, scaler)
                 if result is not None:
                     st.success(f"Predicted PM2.5 level: {result:.2f}")
 
-                # Option to return to training page
                 if st.button("Go back to Training"):
                     st.session_state['page'] = 'train'
-                    st.rerun()
+                    st.experimental_rerun()
 
             except Exception as e:
                 st.error(f"Error during prediction: {e}")
 
-
     else:
-        st.error("No valid DataFrame found in session state. Please upload the data.")
-
-
-
- 
+        st.error("No valid DataFrame found. Please upload the data.")
