@@ -854,7 +854,7 @@ def show_predict():
             st.error(f"Error in preparing data: {e}")
             return
 
-        model_path = os.path.join(MODEL_DIR, selected_model)
+        model_path = os.path.join(os.getcwd(),'models', selected_model)
 
         if st.button("Predict"):
             try:
