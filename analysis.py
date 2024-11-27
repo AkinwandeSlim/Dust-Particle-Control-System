@@ -2,28 +2,21 @@ import streamlit as st
 import numpy as np 
 import pickle
 import pandas as pd
-from sklearn.cluster import KMeans
 from pandas import plotting
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 plt.style.use('fivethirtyeight')
-import plotly.express as px
-from sklearn.preprocessing import LabelEncoder
-from sklearn.cluster import KMeans
 import joblib
+import gc
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import warnings                                  
 warnings.filterwarnings('ignore')
 import seaborn as sns                            # more plots
 from dateutil.relativedelta import relativedelta # working with dates with style
 from scipy.optimize import minimize              # for function minimization
-import statsmodels.formula.api as smf            # statistics and econometrics
-import statsmodels.tsa.api as smt
-import statsmodels.api as sm
 import scipy.stats as scs
 from itertools import product                    # some useful functions
-from tqdm import tqdm_notebook
 from sklearn.metrics import r2_score, median_absolute_error, mean_absolute_error
 from sklearn.metrics import median_absolute_error, mean_squared_log_error
 from sklearn.model_selection import TimeSeriesSplit # you have everything done for you
@@ -35,7 +28,6 @@ from xgboost import XGBRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-
 from scipy import stats
 # let look at a final approach to combine three regression we have so far using Voting method
 from sklearn.ensemble import VotingRegressor
@@ -74,30 +66,7 @@ def convert_df(df):
    return df.to_csv().encode('utf-8')
 
 
-# def Dataset_upload():
-#     # st.markdown('## Upload dataset') # Streamlit also accepts markdown
-#     # st.markdown('**Upload CSV or Excel File**')
-#     data_file = st.file_uploader("**Upload a CSV or Excel file here**", type=["csv", "xlsx"])  # data uploader
-#     if data_file is not None:
-#         # Check file type and read accordingly
-#         if data_file.name.endswith('.csv'):
-#             df = pd.read_csv(data_file)
-#         elif data_file.name.endswith('.xlsx'):
-#             df = pd.read_excel(data_file, engine='openpyxl')
-        
-#         df = df.rename(columns={'pm2.5': 'pm25'})
-#         df = df.drop(['tsp'], axis=1)
-#         df['date'] = df['date'].astype(str)
-#         df['time'] = df['time'].astype(str)
-#         df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'], format='mixed')
-#         df = df.drop(['date', 'time', 'timestamp'], axis=1)
-#         df.set_index(['datetime'], inplace=True)
-#         df = df.astype(float)
-#         # Display data
-#         st.write("## Data Preview")
-#         st.dataframe(df)
 
-#         return df
 
 
 def Dataset_upload():
@@ -127,7 +96,7 @@ def Dataset_upload():
         df = df.drop(['tsp'], axis=1)
         df['date'] = df['date'].astype(str)
         df['time'] = df['time'].astype(str)
-        df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'], format='mixed')
+        df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'],)
         df = df.drop(['date', 'time', 'timestamp'], axis=1)
         df.set_index(['datetime'], inplace=True)
         df = df.astype(float)
@@ -145,11 +114,6 @@ def Dataset_upload():
     st.info("Please upload a dataset.")
     return None
 
-
-
-def save_model(model,modelpath):
-    joblib.dump(model, modelpath )
-    print(f"Model saved successfully in {modelpath}")
 
 
 
@@ -781,6 +745,12 @@ def show_Analysis():
 
                 st.write("Now you can proceed to the prediction page.")
 
+
+
+                # Clear model and variables to free up memory
+                del model, X_train_scaled, X_test_scaled, y_train, y_test, train_predictions, test_predictions
+                gc.collect()  # Manually trigger garbage collection to free up memory
+
                 # # When the user wants to navigate to the prediction page
                 # if st.button("Go to Prediction Page"):
                 #     st.session_state['page'] = 'predict'
@@ -871,6 +841,18 @@ def show_predict():
                 result = predict_single_data_point(model, input_data, X_train, scaler)
                 if result is not None:
                     st.success(f"Predicted PM2.5 level: {result:.2f}")
+
+
+
+                # Clear memory after prediction
+                del model  # Explicitly delete the model object
+                del input_data  # Delete input data if no longer needed
+                gc.collect()  # Trigger garbage collection
+
+
+
+
+
 
                 if st.button("Go back to Training"):
                     st.session_state['page'] = 'train'

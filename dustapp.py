@@ -8,22 +8,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 plt.style.use('fivethirtyeight')
 
-
-import plotly.figure_factory as ff
-
 import base64
-from sklearn.preprocessing import LabelEncoder
-from sklearn.cluster import KMeans
-
 
 import streamlit as st
 # EDA Pkgs
 import os
-
-from PIL import Image,ImageFilter,ImageEnhance
-# from predict_page import predictor
-# from EDAappnew import show_main
-# from EDAappnew import explore_page
 from analysis import show_Analysis
 from analysis import show_predict
 # for some basic operations
@@ -33,11 +22,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import time
-import plotly.express as px
-# from cleanData import stringOutput
-# Components Pkgs
 import streamlit.components.v1 as components
-from streamlit_pandas_profiling import st_profile_report
 import sqlite3
 import joblib
 

@@ -1,5 +1,4 @@
 pip
-setuptools==72.1.0
 joblib
 matplotlib
 openpyxl
@@ -9,13 +8,9 @@ scipy
 seaborn
 statsmodels
 streamlit==1.38.0
-sweetviz
 xgboost
-visions
 scikit-learn
 plotly
-pandas-profiling==3.2.0
-streamlit-pandas-profiling==0.1.2                                                                 
 
 
 
