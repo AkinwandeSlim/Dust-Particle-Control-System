@@ -69,7 +69,63 @@ def convert_df(df):
 
 
 
+# def Dataset_upload():
+#     # Check if the dataset is already in session state
+#     if 'uploaded_data' in st.session_state and isinstance(st.session_state['uploaded_data'], pd.DataFrame):
+#         st.success("Existing dataset loaded from session!")
+#         st.write("## Data Preview")
+#         st.dataframe(st.session_state['uploaded_data'])
+
+#         # Option to re-upload the dataset
+#         reupload = st.checkbox("Re-upload dataset")
+#         if not reupload:
+#             return st.session_state['uploaded_data']
+
+#     # File uploader for new dataset
+#     data_file = st.file_uploader("**Upload a CSV or Excel file here**", type=["csv", "xlsx"])  
+
+#     if data_file is not None:
+#         # Read the uploaded file
+#         if data_file.name.endswith('.csv'):
+#             df = pd.read_csv(data_file)
+#         elif data_file.name.endswith('.xlsx'):
+#             df = pd.read_excel(data_file, engine='openpyxl')
+
+#         # Data preprocessing steps
+#         df = df.rename(columns={'pm2.5': 'pm25'})
+#         df = df.drop(['tsp'], axis=1)
+#         df['date'] = df['date'].astype(str)
+#         df['time'] = df['time'].astype(str)
+#         df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'],)
+#         df = df.drop(['date', 'time', 'timestamp'], axis=1)
+#         df.set_index(['datetime'], inplace=True)
+#         df = df.astype(float)
+
+#         # Store the dataset in session state
+#         st.session_state['uploaded_data'] = df
+
+#         # Display the data
+#         st.write("## Data Preview")
+#         st.dataframe(df)
+
+#         return df
+
+#     # If no data is uploaded and nothing is in session state, show a message
+#     st.info("Please upload a dataset.")
+#     return None
+
+# Handle datetime conversion with error handling
+def parse_datetime(row):
+    try:
+        return pd.to_datetime(row['date'] + ' ' + row['time'], format="%Y-%m-%d %H:%M:%S", errors='coerce')
+    except Exception as e:
+        return pd.NaT  # Assign NaT (Not a Time) if parsing fails
+
+
 def Dataset_upload():
+    # Define the required columns
+    required_columns = ['date', 'time', 'timestamp', 'pm2.5', 'pm10', 'tsp', 'temp', 'hum', 'press', 'wspd', 'wdir', 'rain']
+
     # Check if the dataset is already in session state
     if 'uploaded_data' in st.session_state and isinstance(st.session_state['uploaded_data'], pd.DataFrame):
         st.success("Existing dataset loaded from session!")
@@ -91,12 +147,43 @@ def Dataset_upload():
         elif data_file.name.endswith('.xlsx'):
             df = pd.read_excel(data_file, engine='openpyxl')
 
+        # Check if all required columns are present
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            st.error(f"The uploaded dataset is missing the following required columns: {missing_columns}")
+            return None
+
+        # Check if 'tsp' is present before dropping it
+        if 'tsp' in df.columns:
+            df = df.drop(['tsp'], axis=1)
+        else:
+            st.warning("The 'tsp' column is not present in the dataset.")
+
         # Data preprocessing steps
         df = df.rename(columns={'pm2.5': 'pm25'})
-        df = df.drop(['tsp'], axis=1)
+        # df['date'] = df['date'].astype(str)
+        # df['time'] = df['time'].astype(str)
+        # df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'])
+        
         df['date'] = df['date'].astype(str)
-        df['time'] = df['time'].astype(str)
-        df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'],)
+
+        # Clean up 'time' column: Keep only the last valid HH:MM:SS part
+        df['time'] = df['time'].astype(str).str.extract(r'(\d{2}:\d{2}:\d{2})', expand=False)
+
+        # Handle missing values in 'time' after extraction
+        df['time'].fillna('00:00:00', inplace=True)
+
+        try:
+            # Combine date and cleaned time column
+            df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'], errors='coerce')
+        except Exception as e:
+            st.error(f"Datetime conversion error: {e}")
+            return None
+
+        # Drop rows where datetime conversion failed
+        df.dropna(subset=['datetime'], inplace=True)
+        
+            
         df = df.drop(['date', 'time', 'timestamp'], axis=1)
         df.set_index(['datetime'], inplace=True)
         df = df.astype(float)
@@ -113,9 +200,6 @@ def Dataset_upload():
     # If no data is uploaded and nothing is in session state, show a message
     st.info("Please upload a dataset.")
     return None
-
-
-
 
 
 def plotMovingAverage(series, window, plot_intervals=False, scale=1.96, plot_anomalies=False):
