@@ -11,6 +11,7 @@ The **Dust Particle Control System** is a Streamlit-based web application design
 
 - [Overview](#overview)
 - [Features](#features)
+- [App Screenshots](#App-Screenshots)
 - [Technologies](#technologies)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -54,6 +55,18 @@ The Dust Particle Control System provides a user-friendly platform for air quali
 - **User Authentication:** Secure SQLite login system
 - **Responsive UI:** Streamlit interface with real-time visualizations
 - **Cloud Optimization:** Models fetched from Google Drive; training disabled on Streamlit Cloud
+
+
+
+---
+
+## 🖼️ App Screenshots
+
+### 🔐 Login Page  
+![Login Page](./Screenshot%202025-05-17%20145915.jpg)
+
+### 📊 Data Modeling Dashboard  
+![Data Modeling](./Screenshot%202025-05-17%20150203.jpg)
 
 ---
 
