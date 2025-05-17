@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: dust-control-app
+    env: python
+    plan: free
+    branch: main
+    repo: https://github.com/your-username/dust-control-app
+    startCommand: "streamlit run dustapp.py --server.port $PORT --server.address 0.0.0.0"
+    autoDeploy: trueservices:
+  - type: web
+    name: dust-control-app
+    env: python
+    plan: free
+    branch: main
+    repo: https://github.com/your-username/dust-control-app
+    startCommand: "streamlit run dustapp.py --server.port $PORT --server.address 0.0.0.0"
+    autoDeploy: true

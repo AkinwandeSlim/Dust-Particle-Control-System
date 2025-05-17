@@ -1,0 +1,8 @@
+# Ignore model files
+models/
+
+# Ignore Python cache
+__pycache__/
+
+# Ignore .pem files
+*.pem
