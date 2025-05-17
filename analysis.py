@@ -78,16 +78,27 @@ def get_binary_file_downloader_html(bin_file, file_label='File'):
     return href
 
 
-
-def download_file_from_google_drive(file_id, destination):
-    """Download a file from Google Drive using its file ID."""
+def download_file_from_google_drive(file_id, destination, retries=3):
+    """Download a file from Google Drive with retries."""
     URL = "https://drive.google.com/uc?export=download"
     session = requests.Session()
-    response = session.get(URL, params={'id': file_id}, stream=True)
-    with open(destination, 'wb') as f:
-        for chunk in response.iter_content(32768):
-            if chunk:
-                f.write(chunk)
+    for attempt in range(retries):
+        try:
+            response = session.get(URL, params={'id': file_id}, stream=True)
+            if response.status_code == 200:
+                with open(destination, 'wb') as f:
+                    for chunk in response.iter_content(32768):
+                        if chunk:
+                            f.write(chunk)
+                st.info(f"Successfully downloaded {os.path.basename(destination)}")
+                return True
+            else:
+                st.warning(f"Attempt {attempt + 1}/{retries}: Failed to download {file_id}, status code {response.status_code}")
+        except Exception as e:
+            st.warning(f"Attempt {attempt + 1}/{retries}: Error downloading {file_id}: {str(e)}")
+        time.sleep(2)  # Wait before retry
+    st.error(f"Failed to download {os.path.basename(destination)} after {retries} attempts.")
+    return False
 
 
 
@@ -487,8 +498,6 @@ def plotLSTMResults(model, X_test, y_test, plot_intervals=False, plot_anomalies=
 	plt.grid(True)
 	plt.show()
 	st.pyplot(fig)
-
-
 
 
 def predict_pm25(model, input_features):
@@ -1035,21 +1044,166 @@ def show_Analysis():
 
 
 
+# def show_predict():
+#     st.subheader('Prediction')
+
+#     try:
+#         model_files = [f for f in os.listdir(MODEL_DIR) if f.endswith('.pkl')]
+#     except FileNotFoundError:
+#         st.error("Model directory not found.")
+#         return
+
+#     if not model_files:
+#         st.write("No models available. Please train a model first.")
+#         return
+
+#     selected_model = st.selectbox("Select a saved model", model_files)
+
+#     pm10 = st.number_input("PM10")
+#     temp = st.number_input("Temperature (°C)")
+#     hum = st.number_input("Humidity (%)")
+#     press = st.number_input("Pressure (hPa)")
+#     wspd = st.number_input("Wind Speed (m/s)")
+#     wdir = st.number_input("Wind Direction (°)")
+#     rain = st.number_input("Rainfall (mm)")
+#     hour = st.number_input("Hour", min_value=0, max_value=23, value=12)
+#     minutes = st.number_input("Minutes", min_value=0, max_value=59, value=30)
+
+#     input_data = np.array([pm10, temp, hum, press, wspd, wdir, rain, hour, minutes]).reshape(1, -1)
+
+#     if 'uploaded_data' in st.session_state and isinstance(st.session_state['uploaded_data'], pd.DataFrame):
+#         historical_data = st.session_state['uploaded_data']
+
+#         if 'pm25' not in historical_data.columns:
+#             st.error("'pm25' column missing.")
+#             return
+
+#         historical_data['pm25_log'] = np.log1p(historical_data['pm25'])
+
+#         try:
+#             X_train, _, _, _ = prepareData(historical_data, test_size=0.2, target_encoding=False, timeseries='ml')
+#         except Exception as e:
+#             st.error(f"Error in preparing data: {e}")
+#             return
+
+#         model_path = os.path.join(os.getcwd(),'models', selected_model)
+
+#         if st.button("Predict"):
+#             try:
+#                 if not os.path.exists(model_path):
+#                     st.error(f"Model '{selected_model}' not found.")
+#                     return
+
+#                 model = load_app_model(model_path)
+#                 scaler = st.session_state.get('scaler')
+#                 if scaler is None:
+#                     st.error("Scaler not found. Please upload or re-train.")
+#                     return
+
+#                 result = predict_single_data_point(model, input_data, X_train, scaler)
+#                 if result is not None:
+#                     st.success(f"Predicted PM2.5 level: {result:.2f}")
+
+
+
+#                 # Clear memory after prediction
+#                 del model  # Explicitly delete the model object
+#                 del input_data  # Delete input data if no longer needed
+#                 gc.collect()  # Trigger garbage collection
+
+
+
+
+
+
+#                 if st.button("Go back to Training"):
+#                     st.session_state['page'] = 'train'
+#                     st.experimental_rerun()
+
+#             except Exception as e:
+#                 st.error(f"Error during prediction: {e}")
+
+#     else:
+#         st.error("No valid DataFrame found. Please upload the data.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# XGBoost_model.pkl: https://drive.google.com/file/d/1DqzP7O0RZDeaKthg0qLN2ynj2hokRuGm/view?usp=sharing
+# Voting_model.pkl: https://drive.google.com/file/d/1Svb_vERimJO4--Rpsu71XZdiKSel4tMD/view?usp=sharing
+# Random Forest_model.pkl: https://drive.google.com/file/d/11NiQUSc0xUa5p9TxwO1o-4zNODmXrK1h/view?usp=sharing
+# Linear Regression_model.pkl: https://drive.google.com/file/d/1rk43_7wu2sbMuqoE4TxDfaVsY5FNAm_K/view?usp=sharing
+# Bagging Regressor_model.pkl: https://drive.google.com/file/d/1-dJW1PUTG11aEuaxBNHhhllY62epnLvD/view?usp=sharing
+
+
+
+
+# scaler.pkl: https://drive.google.com/file/d/1SCTira4Ir1SVkbLp8pCoM6AcUUCeavcn/view?usp=sharing
+
+
 def show_predict():
     st.subheader('Prediction')
+    MODEL_DIR = 'models'
+    os.makedirs(MODEL_DIR, exist_ok=True)
 
+    # Google Drive file IDs
+    model_files_info = [
+        {'name': 'XGBoost_model.pkl', 'id': '1DqzP7O0RZDeaKthg0qLN2ynj2hokRuGm'},
+        {'name': 'Voting_model.pkl', 'id': '1Svb_vERimJO4--Rpsu71XZdiKSel4tMD'},
+        {'name': 'Random Forest_model.pkl', 'id': '11NiQUSc0xUa5p9TxwO1o-4zNODmXrK1h'},
+        {'name': 'Linear Regression_model.pkl', 'id': '1rk43_7wu2sbMuqoE4TxDfaVsY5FNAm_K'},
+        {'name': 'Bagging Regressor_model.pkl', 'id': '1-dJW1PUTG11aEuaxBNHhhllY62epnLvD'},
+    ]
+    scaler_file_info = {'name': 'scaler.pkl', 'id': '1SCTira4Ir1SVkbLp8pCoM6AcUUCeavcn'}
+
+    # Download scaler
+    scaler_path = os.path.join(os.getcwd(), scaler_file_info['name'])
+    if not os.path.exists(scaler_path):
+        st.info(f"Downloading {scaler_file_info['name']}...")
+        if not download_file_from_google_drive(scaler_file_info['id'], scaler_path):
+            st.error("Failed to download scaler. Predictions cannot proceed.")
+            return
+
+    # Download models
+    downloaded_models = []
+    for model_info in model_files_info:
+        model_path = os.path.join(MODEL_DIR, model_info['name'])
+        if not os.path.exists(model_path):
+            st.info(f"Downloading {model_info['name']}...")
+            if download_file_from_google_drive(model_info['id'], model_path):
+                downloaded_models.append(model_info['name'])
+            else:
+                st.warning(f"Failed to download {model_info['name']}.")
+        else:
+            downloaded_models.append(model_info['name'])
+
+    # List available models
     try:
         model_files = [f for f in os.listdir(MODEL_DIR) if f.endswith('.pkl')]
     except FileNotFoundError:
         st.error("Model directory not found.")
         return
-
     if not model_files:
-        st.write("No models available. Please train a model first.")
+        st.error("No models available. Please ensure models are downloaded correctly.")
         return
 
     selected_model = st.selectbox("Select a saved model", model_files)
-
     pm10 = st.number_input("PM10")
     temp = st.number_input("Temperature (°C)")
     hum = st.number_input("Humidity (%)")
@@ -1059,60 +1213,40 @@ def show_predict():
     rain = st.number_input("Rainfall (mm)")
     hour = st.number_input("Hour", min_value=0, max_value=23, value=12)
     minutes = st.number_input("Minutes", min_value=0, max_value=59, value=30)
-
     input_data = np.array([pm10, temp, hum, press, wspd, wdir, rain, hour, minutes]).reshape(1, -1)
 
     if 'uploaded_data' in st.session_state and isinstance(st.session_state['uploaded_data'], pd.DataFrame):
         historical_data = st.session_state['uploaded_data']
-
         if 'pm25' not in historical_data.columns:
             st.error("'pm25' column missing.")
             return
-
         historical_data['pm25_log'] = np.log1p(historical_data['pm25'])
-
         try:
             X_train, _, _, _ = prepareData(historical_data, test_size=0.2, target_encoding=False, timeseries='ml')
         except Exception as e:
             st.error(f"Error in preparing data: {e}")
             return
-
-        model_path = os.path.join(os.getcwd(),'models', selected_model)
-
+        model_path = os.path.join(os.getcwd(), 'models', selected_model)
         if st.button("Predict"):
             try:
                 if not os.path.exists(model_path):
                     st.error(f"Model '{selected_model}' not found.")
                     return
-
                 model = load_app_model(model_path)
-                scaler = st.session_state.get('scaler')
-                if scaler is None:
-                    st.error("Scaler not found. Please upload or re-train.")
+                if not os.path.exists(scaler_path):
+                    st.error("Scaler not found. Please ensure scaler is downloaded.")
                     return
-
+                scaler = joblib.load(scaler_path)
+                st.session_state['scaler'] = scaler
                 result = predict_single_data_point(model, input_data, X_train, scaler)
                 if result is not None:
                     st.success(f"Predicted PM2.5 level: {result:.2f}")
-
-
-
-                # Clear memory after prediction
-                del model  # Explicitly delete the model object
-                del input_data  # Delete input data if no longer needed
-                gc.collect()  # Trigger garbage collection
-
-
-
-
-
-
+                del model, input_data
+                gc.collect()
                 if st.button("Go back to Training"):
                     st.session_state['page'] = 'train'
                     st.experimental_rerun()
-
             except Exception as e:
                 st.error(f"Error during prediction: {e}")
-
     else:
         st.error("No valid DataFrame found. Please upload the data.")
